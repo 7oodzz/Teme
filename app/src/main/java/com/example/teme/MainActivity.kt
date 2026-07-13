@@ -94,7 +94,7 @@ fun MainScreen(
         topBar = {
             TopAppBar(
                 title = { 
-                    Text("Tamagotchi", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold) 
+                    Text("Teme", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = Color(0xFF4E342E)) 
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                 actions = {
@@ -196,13 +196,13 @@ fun MainScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("LVL: ${uiState.pet.level}", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-                            Text("COIN: ${uiState.pet.coins}", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                            Text("LVL: ${uiState.pet.level}", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = Color(0xFF4E342E))
+                            Text("COIN: ${uiState.pet.coins}", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = Color(0xFF4E342E))
                         }
                         
                         Spacer(modifier = Modifier.height(8.dp))
                         
-                        Text("EXP", fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                        Text("EXP", fontFamily = FontFamily.Monospace, fontSize = 12.sp, color = Color(0xFF4E342E))
                         val expProgress = uiState.pet.currentExp.toFloat() / uiState.pet.maxExpForNextLevel.toFloat()
                         RetroStatBar(
                             progress = expProgress,
@@ -211,7 +211,7 @@ fun MainScreen(
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        Text("NRG", fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                        Text("NRG", fontFamily = FontFamily.Monospace, fontSize = 12.sp, color = Color(0xFF4E342E))
                         val energyProgress = uiState.pet.energy.toFloat() / 100f
                         RetroStatBar(
                             progress = energyProgress,
@@ -274,6 +274,7 @@ fun MainScreen(
                     currentCoins = uiState.pet.coins,
                     unlockedItems = uiState.unlockedItems,
                     onBuyItem = { id, price -> viewModel.buyItem(id, price) },
+                    onToggleItem = { id, isActive -> viewModel.toggleItemState(id, isActive) },
                     onDismiss = { viewModel.toggleShop() }
                 )
             }
@@ -282,14 +283,17 @@ fun MainScreen(
                 ConfettiParticleSystem()
                 AlertDialog(
                     onDismissRequest = { viewModel.dismissLevelUp() },
-                    title = { Text("LEVEL UP!", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold) },
-                    text = { Text("Your pet reached Level ${uiState.pet.level}!", fontFamily = FontFamily.Monospace) },
+                    containerColor = Color(0xFFD7CCC8), // Cozy background
+                    shape = RoundedCornerShape(4.dp), // Retro shape
+                    title = { Text("LEVEL UP!", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = Color(0xFF4E342E)) },
+                    text = { Text("Your pet reached Level ${uiState.pet.level}!", fontFamily = FontFamily.Monospace, color = Color(0xFF4E342E)) },
                     confirmButton = {
                         Button(
                             onClick = { viewModel.dismissLevelUp() },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4E342E))
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4E342E)),
+                            shape = RoundedCornerShape(4.dp)
                         ) {
-                            Text("AWESOME", fontFamily = FontFamily.Monospace)
+                            Text("AWESOME", fontFamily = FontFamily.Monospace, color = Color.White)
                         }
                     }
                 )
@@ -310,34 +314,42 @@ fun TimerSettingsDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Timer Setup", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold) },
+        containerColor = Color(0xFFD7CCC8), // Cozy background
+        shape = RoundedCornerShape(4.dp), // Retro shape
+        title = { Text("Timer Setup", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = Color(0xFF4E342E)) },
         text = {
             Column {
-                Text("Focus Duration: ${focusTime.toInt()} mins", fontFamily = FontFamily.Monospace)
+                Text("Focus Duration: ${focusTime.toInt()} mins", fontFamily = FontFamily.Monospace, color = Color(0xFF4E342E))
                 Slider(
                     value = focusTime,
                     onValueChange = { focusTime = it },
                     valueRange = 5f..120f,
-                    steps = 23
+                    steps = 23,
+                    colors = SliderDefaults.colors(thumbColor = Color(0xFF4E342E), activeTrackColor = Color(0xFF8D6E63))
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("Break Duration: ${breakTime.toInt()} mins", fontFamily = FontFamily.Monospace)
+                Text("Break Duration: ${breakTime.toInt()} mins", fontFamily = FontFamily.Monospace, color = Color(0xFF4E342E))
                 Slider(
                     value = breakTime,
                     onValueChange = { breakTime = it },
                     valueRange = 1f..30f,
-                    steps = 29
+                    steps = 29,
+                    colors = SliderDefaults.colors(thumbColor = Color(0xFF4E342E), activeTrackColor = Color(0xFF8D6E63))
                 )
             }
         },
         confirmButton = {
-            Button(onClick = { onSave(focusTime.toInt(), breakTime.toInt()) }) {
-                Text("SAVE", fontFamily = FontFamily.Monospace)
+            Button(
+                onClick = { onSave(focusTime.toInt(), breakTime.toInt()) },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4E342E)),
+                shape = RoundedCornerShape(4.dp)
+            ) {
+                Text("SAVE", fontFamily = FontFamily.Monospace, color = Color.White)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("CANCEL", fontFamily = FontFamily.Monospace)
+                Text("CANCEL", fontFamily = FontFamily.Monospace, color = Color(0xFF4E342E))
             }
         }
     )

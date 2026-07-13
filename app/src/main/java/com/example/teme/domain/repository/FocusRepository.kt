@@ -10,4 +10,5 @@ interface FocusRepository {
     
     fun getUnlockedItems(): Flow<List<RoomItem>>
     suspend fun unlockItem(itemId: String)
+    suspend fun toggleItemActiveState(itemId: String, isActive: Boolean)
 }

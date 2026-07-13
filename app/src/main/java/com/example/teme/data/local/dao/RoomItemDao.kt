@@ -14,4 +14,7 @@ interface RoomItemDao {
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun unlockItem(item: RoomItemEntity)
+
+    @Query("UPDATE unlocked_items_table SET isActive = :isActive WHERE itemId = :itemId")
+    suspend fun updateItemActiveState(itemId: String, isActive: Boolean)
 }

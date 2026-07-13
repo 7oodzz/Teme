@@ -47,14 +47,22 @@ class FocusRepositoryImpl @Inject constructor(
 
     override fun getUnlockedItems(): Flow<List<RoomItem>> {
         return roomItemDao.getUnlockedItems().map { unlockedEntities ->
-            val unlockedIds = unlockedEntities.map { it.itemId }.toSet()
+            // Map entity state (unlocked + active status) to domain RoomItem
+            val unlockedMap = unlockedEntities.associateBy({ it.itemId }, { it.isActive })
             SHOP_ITEMS.map { item ->
-                item.copy(isUnlocked = unlockedIds.contains(item.id))
+                val isUnlocked = unlockedMap.containsKey(item.id)
+                val isActive = unlockedMap[item.id] ?: false
+                item.copy(isUnlocked = isUnlocked, isActive = isActive)
             }
         }
     }
 
     override suspend fun unlockItem(itemId: String) {
-        roomItemDao.unlockItem(RoomItemEntity(itemId))
+        // Defaults to active when unlocked
+        roomItemDao.unlockItem(RoomItemEntity(itemId, isActive = true))
+    }
+
+    override suspend fun toggleItemActiveState(itemId: String, isActive: Boolean) {
+        roomItemDao.updateItemActiveState(itemId, isActive)
     }
 }

@@ -117,8 +117,11 @@ fun DynamicGameWorldCanvas(
             drawCircle(color = particleColor, radius = 4f, center = Offset(pX, finalPy))
         }
 
-        // Draw Room Items (Moved left slightly to accommodate campfire)
-        unlockedItems.forEach { item ->
+        // Filter for active items only
+        val activeItems = unlockedItems.filter { it.isActive }
+
+        // Draw active Room Items
+        activeItems.forEach { item ->
             when(item.name) {
                 "Tiny Cactus" -> {
                     drawRect(Color(0xFF81C784), topLeft = Offset(cx - 200f, cy - 60f), size = Size(30f, 60f))
@@ -134,6 +137,30 @@ fun DynamicGameWorldCanvas(
                 "Retro Poster" -> {
                     drawRect(Color(0xFF64B5F6), topLeft = Offset(cx - 150f, cy - 250f), size = Size(160f, 100f))
                     drawRect(Color(0xFF1565C0), topLeft = Offset(cx - 150f, cy - 250f), size = Size(160f, 100f), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 5f))
+                }
+                "Retro PC" -> {
+                    // Monitor
+                    drawRect(Color(0xFFE0E0E0), topLeft = Offset(cx + 120f, cy - 100f), size = Size(80f, 60f))
+                    drawRect(Color(0xFF212121), topLeft = Offset(cx + 125f, cy - 95f), size = Size(70f, 50f))
+                    // Keyboard
+                    drawRect(Color(0xFF9E9E9E), topLeft = Offset(cx + 110f, cy - 30f), size = Size(100f, 20f))
+                }
+                "Game Console" -> {
+                    // Gray console box under TV or by fire
+                    drawRect(Color(0xFF9E9E9E), topLeft = Offset(cx + 60f, cy + 50f), size = Size(60f, 20f))
+                    drawRect(Color(0xFF424242), topLeft = Offset(cx + 70f, cy + 55f), size = Size(40f, 5f))
+                }
+                "Picture Frame" -> {
+                    // Frame on wall
+                    drawRect(Color(0xFF8D6E63), topLeft = Offset(cx + 100f, cy - 220f), size = Size(60f, 80f))
+                    drawRect(Color(0xFFFFF9C4), topLeft = Offset(cx + 105f, cy - 215f), size = Size(50f, 70f))
+                    // Simple drawing inside
+                    drawCircle(Color(0xFFFF8A65), radius = 10f, center = Offset(cx + 130f, cy - 180f))
+                }
+                "Action Figure" -> {
+                    // Small figure
+                    drawRect(Color(0xFFEF5350), topLeft = Offset(cx - 150f, cy - 10f), size = Size(20f, 30f))
+                    drawCircle(Color(0xFFFFCC80), radius = 8f, center = Offset(cx - 140f, cy - 15f))
                 }
             }
         }

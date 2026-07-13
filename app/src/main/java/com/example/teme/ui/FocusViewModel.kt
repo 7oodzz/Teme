@@ -220,4 +220,10 @@ class FocusViewModel @Inject constructor(
             _uiState.update { it.copy(currentDialogue = "Not enough coins...") }
         }
     }
+
+    fun toggleItemState(itemId: String, isActive: Boolean) {
+        viewModelScope.launch {
+            repository.toggleItemActiveState(itemId, isActive)
+        }
+    }
 }
