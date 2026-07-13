@@ -27,7 +27,15 @@ class FocusViewModel @Inject constructor(
     val uiState: StateFlow<FocusUiState> = _uiState.asStateFlow()
 
     private var timerJob: Job? = null
-    private val focusDurationMinutes = 25
+
+    private val petDialogues = listOf(
+        "You're doing great!",
+        "*comfy sigh*",
+        "Keep going, adventurer!",
+        "Almost there!",
+        "Stay focused!",
+        "Let's level up together!"
+    )
 
     init {
         viewModelScope.launch {
@@ -47,6 +55,21 @@ class FocusViewModel @Inject constructor(
         }
     }
 
+    fun updateTimerSettings(focusMins: Int, breakMins: Int) {
+        _uiState.update { 
+            it.copy(
+                focusDurationMinutes = focusMins,
+                breakDurationMinutes = breakMins,
+                timerRemainingSeconds = if (it.sessionType == SessionType.FOCUS) focusMins * 60 else breakMins * 60,
+                showTimerSettings = false
+            )
+        }
+    }
+
+    fun toggleTimerSettings() {
+        _uiState.update { it.copy(showTimerSettings = !it.showTimerSettings) }
+    }
+
     fun toggleTimer() {
         if (_uiState.value.isTimerRunning) {
             pauseTimer()
@@ -56,13 +79,20 @@ class FocusViewModel @Inject constructor(
     }
 
     private fun startTimer() {
-        _uiState.update { it.copy(isTimerRunning = true, currentPetState = PetState.FOCUSING) }
+        _uiState.update { 
+            it.copy(
+                isTimerRunning = true, 
+                currentPetState = if (it.sessionType == SessionType.FOCUS) PetState.FOCUSING else PetState.IDLE,
+                currentDialogue = if (it.sessionType == SessionType.FOCUS) "Focus mode engaged!" else "Time to relax..."
+            )
+        }
+        
         timerJob = viewModelScope.launch {
             while (_uiState.value.timerRemainingSeconds > 0 && _uiState.value.isTimerRunning) {
                 delay(1000L)
                 _uiState.update { it.copy(timerRemainingSeconds = it.timerRemainingSeconds - 1) }
             }
-            if (_uiState.value.timerRemainingSeconds == 0) {
+            if (_uiState.value.timerRemainingSeconds <= 0 && _uiState.value.isTimerRunning) {
                 completeSession()
             }
         }
@@ -70,13 +100,21 @@ class FocusViewModel @Inject constructor(
 
     private fun pauseTimer() {
         timerJob?.cancel()
-        _uiState.update { it.copy(isTimerRunning = false, currentPetState = PetState.ASLEEP) }
+        _uiState.update { 
+            it.copy(
+                isTimerRunning = false, 
+                currentPetState = PetState.ASLEEP,
+                currentDialogue = "*sleeping*"
+            )
+        }
         
-        // Energy penalty on pause/give up
-        viewModelScope.launch {
-            val pet = _uiState.value.pet
-            val newEnergy = (pet.energy - 10).coerceAtLeast(0)
-            repository.savePet(pet.copy(energy = newEnergy))
+        // Energy penalty on pause during focus
+        if (_uiState.value.sessionType == SessionType.FOCUS) {
+            viewModelScope.launch {
+                val pet = _uiState.value.pet
+                val newEnergy = (pet.energy - 5).coerceAtLeast(0)
+                repository.savePet(pet.copy(energy = newEnergy))
+            }
         }
     }
 
@@ -85,8 +123,10 @@ class FocusViewModel @Inject constructor(
         _uiState.update { 
             it.copy(
                 isTimerRunning = false, 
-                timerRemainingSeconds = focusDurationMinutes * 60,
-                currentPetState = PetState.ASLEEP
+                sessionType = SessionType.FOCUS,
+                timerRemainingSeconds = it.focusDurationMinutes * 60,
+                currentPetState = PetState.ASLEEP,
+                currentDialogue = "We can try again later."
             )
         }
         
@@ -98,20 +138,59 @@ class FocusViewModel @Inject constructor(
     }
 
     private fun completeSession() {
+        val wasFocus = _uiState.value.sessionType == SessionType.FOCUS
+        val nextSession = if (wasFocus) SessionType.BREAK else SessionType.FOCUS
+        val nextDuration = if (wasFocus) _uiState.value.breakDurationMinutes else _uiState.value.focusDurationMinutes
+
         _uiState.update { 
             it.copy(
                 isTimerRunning = false,
+                sessionType = nextSession,
+                timerRemainingSeconds = nextDuration * 60,
                 currentPetState = PetState.IDLE,
-                timerRemainingSeconds = focusDurationMinutes * 60
+                currentDialogue = if (wasFocus) "Great job! Time for a break." else "Break is over! Ready?"
             ) 
         }
 
-        viewModelScope.launch {
-            val result = calculateExpUseCase(_uiState.value.pet, focusDurationMinutes)
-            repository.savePet(result.updatedPet)
+        if (wasFocus) {
+            viewModelScope.launch {
+                val result = calculateExpUseCase(_uiState.value.pet, _uiState.value.focusDurationMinutes)
+                repository.savePet(result.updatedPet)
+                
+                // Show floating indicators
+                showFloatingMessage("+${result.earnedCoins} Coins", true)
+                delay(500)
+                showFloatingMessage("+${_uiState.value.focusDurationMinutes * 10} XP", true)
 
-            if (result.didLevelUp) {
-                _uiState.update { it.copy(showLevelUpCelebration = true) }
+                if (result.didLevelUp) {
+                    _uiState.update { it.copy(showLevelUpCelebration = true) }
+                    showFloatingMessage("LEVEL UP!", true)
+                }
+            }
+        }
+    }
+
+    fun interactWithPet() {
+        val dialogue = petDialogues.random()
+        _uiState.update { it.copy(currentDialogue = dialogue) }
+        
+        // Clear dialogue after a few seconds
+        viewModelScope.launch {
+            delay(4000)
+            if (_uiState.value.currentDialogue == dialogue) {
+                _uiState.update { it.copy(currentDialogue = null) }
+            }
+        }
+    }
+
+    private fun showFloatingMessage(text: String, isPositive: Boolean) {
+        val msg = FloatingMessage(text = text, isPositive = isPositive)
+        _uiState.update { it.copy(floatingMessages = it.floatingMessages + msg) }
+        
+        viewModelScope.launch {
+            delay(2000) // Message visible duration
+            _uiState.update { 
+                it.copy(floatingMessages = it.floatingMessages.filter { m -> m.id != msg.id })
             }
         }
     }
@@ -135,7 +214,10 @@ class FocusViewModel @Inject constructor(
                 val updatedPet = _uiState.value.pet.copy(coins = currentCoins - price)
                 repository.savePet(updatedPet)
                 repository.unlockItem(itemId)
+                showFloatingMessage("-$price Coins", false)
             }
+        } else {
+            _uiState.update { it.copy(currentDialogue = "Not enough coins...") }
         }
     }
 }

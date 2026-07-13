@@ -9,8 +9,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.*
@@ -18,16 +18,18 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.teme.audio.ProceduralAudioPlayer
 import com.example.teme.ui.FocusViewModel
-import com.example.teme.ui.components.ConfettiParticleSystem
-import com.example.teme.ui.components.PetCanvas
-import com.example.teme.ui.components.ShopScreen
-import com.example.teme.ui.components.TimerDisplay
+import com.example.teme.ui.SessionType
+import com.example.teme.ui.components.*
 import com.example.teme.ui.theme.TemeTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
@@ -59,20 +61,18 @@ fun MainScreen(
     viewModel: FocusViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val haptic = LocalHapticFeedback.current
 
     // Handle Audio state changes
     LaunchedEffect(uiState.isAudioPlaying) {
-        if (uiState.isAudioPlaying) {
-            audioPlayer.startPlaying()
-        } else {
-            audioPlayer.stopPlaying()
-        }
+        if (uiState.isAudioPlaying) audioPlayer.startPlaying() else audioPlayer.stopPlaying()
     }
 
     // Shake effect for level up
     var shakeOffset by remember { mutableStateOf(0f) }
     LaunchedEffect(uiState.showLevelUpCelebration) {
         if (uiState.showLevelUpCelebration) {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
             for (i in 0..10) {
                 shakeOffset = if (i % 2 == 0) 10f else -10f
                 delay(50)
@@ -81,23 +81,35 @@ fun MainScreen(
         }
     }
 
+    // Subtle haptics during timer
+    LaunchedEffect(uiState.timerRemainingSeconds) {
+        if (uiState.isTimerRunning && uiState.timerRemainingSeconds % 60 == 0) {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) // rhythmic tick every minute
+        }
+    }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = Color(0xFFFFF8E1), // Cozy Cream background
+        containerColor = Color(0xFFEFEBE9), // Soft Slate/Cream
         topBar = {
             TopAppBar(
-                title = { Text("Focus Tamagotchi", fontWeight = FontWeight.Bold, color = Color(0xFF5D4037)) },
+                title = { 
+                    Text("Tamagotchi", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold) 
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                 actions = {
+                    IconButton(onClick = { viewModel.toggleTimerSettings() }) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color(0xFF4E342E))
+                    }
                     IconButton(onClick = { viewModel.toggleAudio() }) {
                         Icon(
                             imageVector = if (uiState.isAudioPlaying) Icons.Rounded.Close else Icons.Rounded.PlayArrow,
                             contentDescription = "Toggle Audio",
-                            tint = Color(0xFF5D4037)
+                            tint = Color(0xFF4E342E)
                         )
                     }
                     IconButton(onClick = { viewModel.toggleShop() }) {
-                        Icon(Icons.Default.ShoppingCart, contentDescription = "Shop", tint = Color(0xFF5D4037))
+                        Icon(Icons.Default.ShoppingCart, contentDescription = "Shop", tint = Color(0xFF4E342E))
                     }
                 }
             )
@@ -113,94 +125,150 @@ fun MainScreen(
                 modifier = Modifier.fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Top: Room Canvas (Weight 1)
+                // Top: Dynamic Game World Canvas (Campfire + Pet + Background)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .background(Color(0xFFE8F5E9), RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
                 ) {
-                    PetCanvas(
+                    DynamicGameWorldCanvas(
                         petState = uiState.currentPetState,
-                        unlockedItems = uiState.unlockedItems
+                        unlockedItems = uiState.unlockedItems,
+                        timerProgress = uiState.timerProgress,
+                        onPetTap = { 
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            viewModel.interactWithPet() 
+                        }
+                    )
+                    
+                    // Floating Indicators over the canvas
+                    uiState.floatingMessages.forEach { msg ->
+                        FloatingIndicator(
+                            text = msg.text,
+                            isPositive = msg.isPositive,
+                            modifier = Modifier.align(Alignment.Center)
+                        )
+                    }
+
+                    // Numeric Timer Overlay
+                    Text(
+                        text = uiState.timerFormatted,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 48.sp,
+                        color = Color.White,
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 16.dp)
+                    )
+                    
+                    Text(
+                        text = if (uiState.sessionType == SessionType.FOCUS) "FOCUS" else "BREAK",
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        color = if (uiState.sessionType == SessionType.FOCUS) Color(0xFFFFCC80) else Color(0xFF81D4FA),
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 70.dp)
                     )
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
-
-                // Middle: Timer
-                val maxTimer = 25 * 60f
-                TimerDisplay(
-                    formattedTime = uiState.timerFormatted,
-                    progress = 1f - (uiState.timerRemainingSeconds / maxTimer)
-                )
-
-                Spacer(modifier = Modifier.height(32.dp))
-
-                // Bottom: Controls and Stats
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    Button(
-                        onClick = { viewModel.toggleTimer() },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFAED581)),
-                        modifier = Modifier.size(width = 120.dp, height = 50.dp)
-                    ) {
-                        Text(if (uiState.isTimerRunning) "Pause" else "Start", color = Color(0xFF33691E))
-                    }
-
-                    if (uiState.isTimerRunning) {
-                        Button(
-                            onClick = { viewModel.giveUp() },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE57373)),
-                            modifier = Modifier.size(width = 120.dp, height = 50.dp)
-                        ) {
-                            Text("Give Up", color = Color.White)
-                        }
-                    }
+                // Middle: Dialogue Box
+                if (uiState.currentDialogue != null) {
+                    TypewriterText(
+                        text = uiState.currentDialogue!!,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                } else {
+                    Spacer(modifier = Modifier.height(64.dp))
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
-
-                // Status Bar
+                // Bottom: Controls and Stats (Retro Style)
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 32.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFCC80))
+                        .padding(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFD7CCC8)),
+                    shape = RoundedCornerShape(0.dp) // blocky
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("Level: ${uiState.pet.level}", fontWeight = FontWeight.Bold, color = Color(0xFFE65100))
-                            Text("Coins: ${uiState.pet.coins}", fontWeight = FontWeight.Bold, color = Color(0xFFE65100))
+                            Text("LVL: ${uiState.pet.level}", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                            Text("COIN: ${uiState.pet.coins}", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
                         }
+                        
                         Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Text("EXP", fontFamily = FontFamily.Monospace, fontSize = 12.sp)
                         val expProgress = uiState.pet.currentExp.toFloat() / uiState.pet.maxExpForNextLevel.toFloat()
-                        LinearProgressIndicator(
-                            progress = { expProgress },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(8.dp),
-                            color = Color(0xFF4CAF50),
-                            trackColor = Color(0xFFFFF3E0)
+                        RetroStatBar(
+                            progress = expProgress,
+                            fillColor = Color(0xFF81C784)
                         )
-                        Text(
-                            text = "Energy: ${uiState.pet.energy}/100",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFFE65100),
-                            modifier = Modifier.padding(top = 4.dp)
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text("NRG", fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                        val energyProgress = uiState.pet.energy.toFloat() / 100f
+                        RetroStatBar(
+                            progress = energyProgress,
+                            fillColor = Color(0xFF64B5F6)
                         )
                     }
                 }
-                
-                Spacer(modifier = Modifier.height(32.dp))
+
+                // Action Buttons
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 32.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    Button(
+                        onClick = { 
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            viewModel.toggleTimer() 
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4E342E)),
+                        shape = RoundedCornerShape(4.dp),
+                        modifier = Modifier.size(width = 120.dp, height = 50.dp)
+                    ) {
+                        Text(
+                            text = if (uiState.isTimerRunning) "PAUSE" else "START", 
+                            fontFamily = FontFamily.Monospace, 
+                            color = Color.White
+                        )
+                    }
+
+                    if (uiState.isTimerRunning) {
+                        Button(
+                            onClick = { 
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                viewModel.giveUp() 
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
+                            shape = RoundedCornerShape(4.dp),
+                            modifier = Modifier.size(width = 120.dp, height = 50.dp)
+                        ) {
+                            Text("GIVE UP", fontFamily = FontFamily.Monospace, color = Color.White)
+                        }
+                    }
+                }
             }
 
             // Overlays
+            if (uiState.showTimerSettings) {
+                TimerSettingsDialog(
+                    initialFocus = uiState.focusDurationMinutes,
+                    initialBreak = uiState.breakDurationMinutes,
+                    onSave = { f, b -> viewModel.updateTimerSettings(f, b) },
+                    onDismiss = { viewModel.toggleTimerSettings() }
+                )
+            }
+
             if (uiState.showShop) {
                 ShopScreen(
                     currentCoins = uiState.pet.coins,
@@ -214,15 +282,63 @@ fun MainScreen(
                 ConfettiParticleSystem()
                 AlertDialog(
                     onDismissRequest = { viewModel.dismissLevelUp() },
-                    title = { Text("Level Up!") },
-                    text = { Text("Your pet reached Level ${uiState.pet.level}!") },
+                    title = { Text("LEVEL UP!", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold) },
+                    text = { Text("Your pet reached Level ${uiState.pet.level}!", fontFamily = FontFamily.Monospace) },
                     confirmButton = {
-                        Button(onClick = { viewModel.dismissLevelUp() }) {
-                            Text("Awesome")
+                        Button(
+                            onClick = { viewModel.dismissLevelUp() },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4E342E))
+                        ) {
+                            Text("AWESOME", fontFamily = FontFamily.Monospace)
                         }
                     }
                 )
             }
         }
     }
+}
+
+@Composable
+fun TimerSettingsDialog(
+    initialFocus: Int,
+    initialBreak: Int,
+    onSave: (Int, Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var focusTime by remember { mutableStateOf(initialFocus.toFloat()) }
+    var breakTime by remember { mutableStateOf(initialBreak.toFloat()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Timer Setup", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold) },
+        text = {
+            Column {
+                Text("Focus Duration: ${focusTime.toInt()} mins", fontFamily = FontFamily.Monospace)
+                Slider(
+                    value = focusTime,
+                    onValueChange = { focusTime = it },
+                    valueRange = 5f..120f,
+                    steps = 23
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Break Duration: ${breakTime.toInt()} mins", fontFamily = FontFamily.Monospace)
+                Slider(
+                    value = breakTime,
+                    onValueChange = { breakTime = it },
+                    valueRange = 1f..30f,
+                    steps = 29
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onSave(focusTime.toInt(), breakTime.toInt()) }) {
+                Text("SAVE", fontFamily = FontFamily.Monospace)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("CANCEL", fontFamily = FontFamily.Monospace)
+            }
+        }
+    )
 }
