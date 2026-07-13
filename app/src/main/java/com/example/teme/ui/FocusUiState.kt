@@ -5,10 +5,6 @@ import com.example.teme.domain.model.PetState
 import com.example.teme.domain.model.RoomItem
 import java.util.UUID
 
-enum class SessionType {
-    FOCUS, BREAK
-}
-
 data class FloatingMessage(
     val id: String = UUID.randomUUID().toString(),
     val text: String,
@@ -21,10 +17,8 @@ data class FocusUiState(
     
     // Timer configurations
     val focusDurationMinutes: Int = 25,
-    val breakDurationMinutes: Int = 5,
     val timerRemainingSeconds: Int = 25 * 60,
     val isTimerRunning: Boolean = false,
-    val sessionType: SessionType = SessionType.FOCUS,
     
     val currentPetState: PetState = PetState.IDLE,
     val currentDialogue: String? = null,
@@ -45,7 +39,7 @@ data class FocusUiState(
         
     val timerProgress: Float
         get() {
-            val maxSeconds = if (sessionType == SessionType.FOCUS) focusDurationMinutes * 60 else breakDurationMinutes * 60
+            val maxSeconds = focusDurationMinutes * 60
             if (maxSeconds == 0) return 0f
             return 1f - (timerRemainingSeconds.toFloat() / maxSeconds.toFloat())
         }

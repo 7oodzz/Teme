@@ -1,6 +1,7 @@
 package com.example.teme
 
 import android.os.Bundle
+import android.view.SoundEffectConstants
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -20,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -28,7 +30,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.teme.audio.ProceduralAudioPlayer
 import com.example.teme.ui.FocusViewModel
-import com.example.teme.ui.SessionType
 import com.example.teme.ui.components.*
 import com.example.teme.ui.theme.TemeTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -62,6 +63,7 @@ fun MainScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
 
     // Handle Audio state changes
     LaunchedEffect(uiState.isAudioPlaying) {
@@ -98,17 +100,29 @@ fun MainScreen(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                 actions = {
-                    IconButton(onClick = { viewModel.toggleTimerSettings() }) {
+                    IconButton(onClick = { 
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        view.playSoundEffect(SoundEffectConstants.CLICK)
+                        viewModel.toggleTimerSettings() 
+                    }) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color(0xFF4E342E))
                     }
-                    IconButton(onClick = { viewModel.toggleAudio() }) {
+                    IconButton(onClick = { 
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        view.playSoundEffect(SoundEffectConstants.CLICK)
+                        viewModel.toggleAudio() 
+                    }) {
                         Icon(
                             imageVector = if (uiState.isAudioPlaying) Icons.Rounded.Close else Icons.Rounded.PlayArrow,
                             contentDescription = "Toggle Audio",
                             tint = Color(0xFF4E342E)
                         )
                     }
-                    IconButton(onClick = { viewModel.toggleShop() }) {
+                    IconButton(onClick = { 
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        view.playSoundEffect(SoundEffectConstants.CLICK)
+                        viewModel.toggleShop() 
+                    }) {
                         Icon(Icons.Default.ShoppingCart, contentDescription = "Shop", tint = Color(0xFF4E342E))
                     }
                 }
@@ -137,6 +151,7 @@ fun MainScreen(
                         timerProgress = uiState.timerProgress,
                         onPetTap = { 
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            view.playSoundEffect(SoundEffectConstants.CLICK)
                             viewModel.interactWithPet() 
                         }
                     )
@@ -163,10 +178,10 @@ fun MainScreen(
                     )
                     
                     Text(
-                        text = if (uiState.sessionType == SessionType.FOCUS) "FOCUS" else "BREAK",
+                        text = "FOCUS",
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
-                        color = if (uiState.sessionType == SessionType.FOCUS) Color(0xFFFFCC80) else Color(0xFF81D4FA),
+                        color = Color(0xFFFFCC80),
                         modifier = Modifier
                             .align(Alignment.TopCenter)
                             .padding(top = 70.dp)
@@ -230,6 +245,7 @@ fun MainScreen(
                     Button(
                         onClick = { 
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            view.playSoundEffect(SoundEffectConstants.CLICK)
                             viewModel.toggleTimer() 
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4E342E)),
@@ -247,6 +263,7 @@ fun MainScreen(
                         Button(
                             onClick = { 
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                view.playSoundEffect(SoundEffectConstants.CLICK)
                                 viewModel.giveUp() 
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
@@ -263,8 +280,7 @@ fun MainScreen(
             if (uiState.showTimerSettings) {
                 TimerSettingsDialog(
                     initialFocus = uiState.focusDurationMinutes,
-                    initialBreak = uiState.breakDurationMinutes,
-                    onSave = { f, b -> viewModel.updateTimerSettings(f, b) },
+                    onSave = { f -> viewModel.updateTimerSettings(f) },
                     onDismiss = { viewModel.toggleTimerSettings() }
                 )
             }
@@ -289,7 +305,11 @@ fun MainScreen(
                     text = { Text("Your pet reached Level ${uiState.pet.level}!", fontFamily = FontFamily.Monospace, color = Color(0xFF4E342E)) },
                     confirmButton = {
                         Button(
-                            onClick = { viewModel.dismissLevelUp() },
+                            onClick = { 
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                view.playSoundEffect(SoundEffectConstants.CLICK)
+                                viewModel.dismissLevelUp() 
+                            },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4E342E)),
                             shape = RoundedCornerShape(4.dp)
                         ) {
@@ -305,15 +325,18 @@ fun MainScreen(
 @Composable
 fun TimerSettingsDialog(
     initialFocus: Int,
-    initialBreak: Int,
-    onSave: (Int, Int) -> Unit,
+    onSave: (Int) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
     var focusTime by remember { mutableStateOf(initialFocus.toFloat()) }
-    var breakTime by remember { mutableStateOf(initialBreak.toFloat()) }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {
+            view.playSoundEffect(SoundEffectConstants.CLICK)
+            onDismiss()
+        },
         containerColor = Color(0xFFD7CCC8), // Cozy background
         shape = RoundedCornerShape(4.dp), // Retro shape
         title = { Text("Timer Setup", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = Color(0xFF4E342E)) },
@@ -322,25 +345,23 @@ fun TimerSettingsDialog(
                 Text("Focus Duration: ${focusTime.toInt()} mins", fontFamily = FontFamily.Monospace, color = Color(0xFF4E342E))
                 Slider(
                     value = focusTime,
-                    onValueChange = { focusTime = it },
+                    onValueChange = { 
+                        focusTime = it 
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    },
                     valueRange = 5f..120f,
-                    steps = 23,
-                    colors = SliderDefaults.colors(thumbColor = Color(0xFF4E342E), activeTrackColor = Color(0xFF8D6E63))
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Break Duration: ${breakTime.toInt()} mins", fontFamily = FontFamily.Monospace, color = Color(0xFF4E342E))
-                Slider(
-                    value = breakTime,
-                    onValueChange = { breakTime = it },
-                    valueRange = 1f..30f,
-                    steps = 29,
+                    steps = 22, // Correct steps for exactly 5-minute increments
                     colors = SliderDefaults.colors(thumbColor = Color(0xFF4E342E), activeTrackColor = Color(0xFF8D6E63))
                 )
             }
         },
         confirmButton = {
             Button(
-                onClick = { onSave(focusTime.toInt(), breakTime.toInt()) },
+                onClick = { 
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    view.playSoundEffect(SoundEffectConstants.CLICK)
+                    onSave(focusTime.toInt()) 
+                },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4E342E)),
                 shape = RoundedCornerShape(4.dp)
             ) {
@@ -348,7 +369,11 @@ fun TimerSettingsDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                view.playSoundEffect(SoundEffectConstants.CLICK)
+                onDismiss()
+            }) {
                 Text("CANCEL", fontFamily = FontFamily.Monospace, color = Color(0xFF4E342E))
             }
         }

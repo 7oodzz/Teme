@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.teme.domain.model.Pet
 import com.example.teme.domain.model.PetState
+import com.example.teme.domain.model.SHOP_ITEMS
 import com.example.teme.domain.repository.FocusRepository
 import com.example.teme.domain.usecase.CalculateExpUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -50,17 +51,23 @@ class FocusViewModel @Inject constructor(
 
         viewModelScope.launch {
             repository.getUnlockedItems().collectLatest { items ->
-                _uiState.update { it.copy(unlockedItems = items) }
+                val actuallyUnlocked = items.filter { it.isUnlocked }
+                if (actuallyUnlocked.isEmpty()) {
+                    // Give the user 2 starting items automatically
+                    repository.unlockItem(SHOP_ITEMS[0].id)
+                    repository.unlockItem(SHOP_ITEMS[1].id)
+                } else {
+                    _uiState.update { it.copy(unlockedItems = items) }
+                }
             }
         }
     }
 
-    fun updateTimerSettings(focusMins: Int, breakMins: Int) {
+    fun updateTimerSettings(focusMins: Int) {
         _uiState.update { 
             it.copy(
                 focusDurationMinutes = focusMins,
-                breakDurationMinutes = breakMins,
-                timerRemainingSeconds = if (it.sessionType == SessionType.FOCUS) focusMins * 60 else breakMins * 60,
+                timerRemainingSeconds = focusMins * 60,
                 showTimerSettings = false
             )
         }
@@ -82,8 +89,8 @@ class FocusViewModel @Inject constructor(
         _uiState.update { 
             it.copy(
                 isTimerRunning = true, 
-                currentPetState = if (it.sessionType == SessionType.FOCUS) PetState.FOCUSING else PetState.IDLE,
-                currentDialogue = if (it.sessionType == SessionType.FOCUS) "Focus mode engaged!" else "Time to relax..."
+                currentPetState = PetState.FOCUSING,
+                currentDialogue = "Focus mode engaged!"
             )
         }
         
@@ -109,12 +116,10 @@ class FocusViewModel @Inject constructor(
         }
         
         // Energy penalty on pause during focus
-        if (_uiState.value.sessionType == SessionType.FOCUS) {
-            viewModelScope.launch {
-                val pet = _uiState.value.pet
-                val newEnergy = (pet.energy - 5).coerceAtLeast(0)
-                repository.savePet(pet.copy(energy = newEnergy))
-            }
+        viewModelScope.launch {
+            val pet = _uiState.value.pet
+            val newEnergy = (pet.energy - 5).coerceAtLeast(0)
+            repository.savePet(pet.copy(energy = newEnergy))
         }
     }
 
@@ -123,7 +128,6 @@ class FocusViewModel @Inject constructor(
         _uiState.update { 
             it.copy(
                 isTimerRunning = false, 
-                sessionType = SessionType.FOCUS,
                 timerRemainingSeconds = it.focusDurationMinutes * 60,
                 currentPetState = PetState.ASLEEP,
                 currentDialogue = "We can try again later."
@@ -138,34 +142,27 @@ class FocusViewModel @Inject constructor(
     }
 
     private fun completeSession() {
-        val wasFocus = _uiState.value.sessionType == SessionType.FOCUS
-        val nextSession = if (wasFocus) SessionType.BREAK else SessionType.FOCUS
-        val nextDuration = if (wasFocus) _uiState.value.breakDurationMinutes else _uiState.value.focusDurationMinutes
-
         _uiState.update { 
             it.copy(
                 isTimerRunning = false,
-                sessionType = nextSession,
-                timerRemainingSeconds = nextDuration * 60,
+                timerRemainingSeconds = it.focusDurationMinutes * 60,
                 currentPetState = PetState.IDLE,
-                currentDialogue = if (wasFocus) "Great job! Time for a break." else "Break is over! Ready?"
+                currentDialogue = "Great job! Session complete."
             ) 
         }
 
-        if (wasFocus) {
-            viewModelScope.launch {
-                val result = calculateExpUseCase(_uiState.value.pet, _uiState.value.focusDurationMinutes)
-                repository.savePet(result.updatedPet)
-                
-                // Show floating indicators
-                showFloatingMessage("+${result.earnedCoins} Coins", true)
-                delay(500)
-                showFloatingMessage("+${_uiState.value.focusDurationMinutes * 10} XP", true)
+        viewModelScope.launch {
+            val result = calculateExpUseCase(_uiState.value.pet, _uiState.value.focusDurationMinutes)
+            repository.savePet(result.updatedPet)
+            
+            // Show floating indicators
+            showFloatingMessage("+${result.earnedCoins} Coins", true)
+            delay(500)
+            showFloatingMessage("+${_uiState.value.focusDurationMinutes * 10} XP", true)
 
-                if (result.didLevelUp) {
-                    _uiState.update { it.copy(showLevelUpCelebration = true) }
-                    showFloatingMessage("LEVEL UP!", true)
-                }
+            if (result.didLevelUp) {
+                _uiState.update { it.copy(showLevelUpCelebration = true) }
+                showFloatingMessage("LEVEL UP!", true)
             }
         }
     }

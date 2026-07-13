@@ -1,5 +1,6 @@
 package com.example.teme.ui.components
 
+import android.view.SoundEffectConstants
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -12,22 +13,30 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.example.teme.domain.model.RoomItem
-import com.example.teme.domain.model.SHOP_ITEMS
 
 @Composable
 fun ShopScreen(
     currentCoins: Int,
-    unlockedItems: List<RoomItem>,
+    unlockedItems: List<RoomItem>, // This list actually contains all items mapped properly by the Repository
     onBuyItem: (String, Int) -> Unit,
     onToggleItem: (String, Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
-    Dialog(onDismissRequest = onDismiss) {
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
+
+    Dialog(onDismissRequest = {
+        view.playSoundEffect(SoundEffectConstants.CLICK)
+        onDismiss()
+    }) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -50,7 +59,11 @@ fun ShopScreen(
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF4E342E)
                     )
-                    IconButton(onClick = onDismiss) {
+                    IconButton(onClick = { 
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        view.playSoundEffect(SoundEffectConstants.CLICK)
+                        onDismiss() 
+                    }) {
                         Icon(Icons.Default.Close, contentDescription = "Close Shop", tint = Color(0xFF4E342E))
                     }
                 }
@@ -67,21 +80,21 @@ fun ShopScreen(
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Update SHOP_ITEMS with actual unlock status from unlockedItems list
-                    val mergedItems = SHOP_ITEMS.map { shopItem ->
-                        val unlockedDomainItem = unlockedItems.find { it.id == shopItem.id }
-                        shopItem.copy(
-                            isUnlocked = unlockedDomainItem != null,
-                            isActive = unlockedDomainItem?.isActive ?: false
-                        )
-                    }
-
-                    items(mergedItems) { item ->
+                    // Use unlockedItems directly since the repo maps the full SHOP_ITEMS correctly
+                    items(unlockedItems) { item ->
                         ShopItemRow(
                             item = item,
                             canAfford = currentCoins >= item.price,
-                            onBuyClick = { onBuyItem(item.id, item.price) },
-                            onToggleClick = { isActive -> onToggleItem(item.id, isActive) }
+                            onBuyClick = { 
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                view.playSoundEffect(SoundEffectConstants.CLICK)
+                                onBuyItem(item.id, item.price) 
+                            },
+                            onToggleClick = { isActive -> 
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                view.playSoundEffect(SoundEffectConstants.CLICK)
+                                onToggleItem(item.id, isActive) 
+                            }
                         )
                     }
                 }
